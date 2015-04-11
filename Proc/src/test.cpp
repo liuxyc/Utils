@@ -6,7 +6,6 @@
 int main(int argc, char *argv[])
 {
     Procc pp;
-    while(1) {
     std::vector<const char *> vec_cmd;
     vec_cmd.push_back("/sbin/ifconfig");
     vec_cmd.push_back("/sbin/ifconfig -a");
@@ -29,6 +28,7 @@ int main(int argc, char *argv[])
     vec_cmd_shell.push_back("cd ~/ && /sbin/ifconfig -a");
     vec_cmd_shell.push_back("ls");
     vec_cmd_shell.push_back("ls -a -l");
+    vec_cmd_shell.push_back("unkonw -a -l");
     for (auto it = vec_cmd_shell.begin(); it != vec_cmd_shell.end(); ++it) {
         pp.run(*it, true, "");
         char *stdoutbuf = NULL;
@@ -40,9 +40,6 @@ int main(int argc, char *argv[])
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
     }
-    usleep(50000);
-    }
-
     
     return 0;
     
