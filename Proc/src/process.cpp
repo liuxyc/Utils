@@ -40,31 +40,36 @@ Procc::~Procc()
 
 bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
 {
-    char *exe_args[256] = {NULL};
+    char **exe_args = NULL;
     char exe_file[256] = {NULL};
-    int user_arg_index = 0;
+    std::vector<std::string> vec_cmd_args;
     if (use_shell) {
         strcpy(exe_file, "/bin/sh");
+        exe_args = new char*[4];
         exe_args[0] = static_cast<char *>("/bin/sh");
         exe_args[1] = static_cast<char *>("-c");
         exe_args[2] = (char *)cmd.c_str();
+        exe_args[3] = NULL;
     }
     else {
-        std::vector<std::string> vec_cmd_args;
         boost::split(vec_cmd_args, cmd, boost::is_any_of(" "));
         strcpy(exe_file, vec_cmd_args[0].c_str());
-        for (size_t i = 0; i < vec_cmd_args.size(); ++i) {
-            exe_args[i] = (char *)(vec_cmd_args[i].c_str());
+        if (vec_cmd_args.size() > 0) {
+            exe_args = new char*[vec_cmd_args.size() + 1];
+            for (size_t i = 0; i < vec_cmd_args.size(); ++i) {
+                exe_args[i] = (char *)(vec_cmd_args[i].c_str());
+            }
+            exe_args[vec_cmd_args.size()] = NULL;
+
+
+        }
+        else {
+            exe_args = new char*[2];
+            exe_args[0] = (char *)(vec_cmd_args[0].c_str());
+            exe_args[1] = NULL;
         }
     }
 
-    if (cwd != "") {
-        int ret = chdir(cwd.c_str());
-        if (ret != 0) {
-            printf("chdir to %s error \n", cwd.c_str());
-            return false;
-        }
-    }
     pid = vfork();
     if (pid == 0)//子进程
     {
@@ -73,12 +78,20 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
         ::close(stderr_pipe_fd[0]);
         ::dup2(stdout_pipe_fd[1], 1);
         ::dup2(stderr_pipe_fd[1], 2);
+        if (cwd != "") {
+            int ret = chdir(cwd.c_str());
+            if (ret != 0) {
+                printf("chdir to %s error \n", cwd.c_str());
+                return false;
+            }
+        }
 
         ::execvp(exe_file, exe_args);
 
         //NOTICE:如果execvp失败，这里不调_exit()会惨死哦
         ::_exit(-1);
     }
+    delete [] exe_args;
     return true;
 }
 

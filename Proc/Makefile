@@ -7,3 +7,6 @@ test.o: src/test.cpp
 
 process.o: src/process.cpp include/process.h
 	g++ -c -g -std=c++11 -I./include src/process.cpp
+
+clean:
+	rm -f *.o proc_test
