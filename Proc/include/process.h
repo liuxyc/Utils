@@ -5,7 +5,8 @@ class Procc
     public:
         Procc();
         ~Procc();
-        bool run(const std::string &cmd, bool use_shell, const std::string &cwd);
+        bool system(const std::string &cmd, const std::string &cwd);
+        bool run(const std::string &cmd, bool need_out, bool use_shell, const std::string &cwd);
         int communicate(char **stdout_b, char **stderr_b);
 
     private:
@@ -15,7 +16,7 @@ class Procc
         bool isInit;
         char *stdout_buf;
         char *stderr_buf;
-        const size_t BCLOUD_PROC_MAX_STDOUT_BUF;
-        const size_t BCLOUD_PROC_MAX_STDERR_BUF;
+        const size_t PROC_MAX_STDOUT_BUF;
+        const size_t PROC_MAX_STDERR_BUF;
 };
 
