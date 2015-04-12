@@ -10,10 +10,12 @@
 #include <algorithm>
 #include <fcntl.h>
 
-Procc::Procc()
+Procc::Procc(int std_out_fd, int std_err_fd)
 : isInit(false)
 , stdout_buf(NULL)
 , stderr_buf(NULL)
+, m_std_out_fd(std_out_fd)
+, m_std_err_fd(std_err_fd)
 , PROC_MAX_STDOUT_BUF(1024*1024*64)
 , PROC_MAX_STDERR_BUF(1024*1024*64)
 {
@@ -29,12 +31,7 @@ Procc::~Procc()
     delete [] stderr_buf;
 }
 
-bool Procc::system(const std::string &cmd, const std::string &cwd) 
-{
-    return run(cmd, false, true, cwd);
-}
-
-bool Procc::run(const std::string &cmd, bool need_out, bool use_shell, const std::string &cwd)
+bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
 {
     char **exe_args = NULL;
     const char *exe_file = NULL;
@@ -80,15 +77,32 @@ bool Procc::run(const std::string &cmd, bool need_out, bool use_shell, const std
     if (pid == 0)//子进程
     {
         printf("cmd sub process started\n");
-        ::close(stdout_pipe_fd[0]);
-        ::close(stderr_pipe_fd[0]);
         ::close(STDIN_FILENO);
-        if (need_out) {
+        if (m_std_out_fd == PROCC_STDOUT_PIPE) {
+            ::close(stdout_pipe_fd[0]);
             if (::dup2(stdout_pipe_fd[1], STDOUT_FILENO) < 0) {
                 printf("dup2 stdout error\n");
                 ::_exit(-1);
             }
+        }
+        else if (m_std_out_fd >= 0) {
+            ::close(stdout_pipe_fd[1]);
+            if (::dup2(m_std_out_fd, STDOUT_FILENO) < 0) {
+                printf("dup2 stdout error\n");
+                ::_exit(-1);
+            }
+        }
+
+        if (m_std_err_fd == PROCC_STDERR_PIPE) {
+            ::close(stderr_pipe_fd[0]);
             if (::dup2(stderr_pipe_fd[1], STDERR_FILENO) < 0) {
+                printf("dup2 stderr error\n");
+                ::_exit(-1);
+            }
+        }
+        else if (m_std_err_fd >= 0) {
+            ::close(stderr_pipe_fd[1]);
+            if (::dup2(m_std_err_fd, STDERR_FILENO) < 0) {
                 printf("dup2 stderr error\n");
                 ::_exit(-1);
             }
@@ -112,9 +126,9 @@ bool Procc::run(const std::string &cmd, bool need_out, bool use_shell, const std
     return true;
 }
 
+
 int Procc::communicate(char **stdout_b, char **stderr_b)
 {
-
     memset(stdout_buf, 0, PROC_MAX_STDOUT_BUF);
     memset(stderr_buf, 0, PROC_MAX_STDERR_BUF);
 
@@ -132,7 +146,7 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
     while(1) {
         FD_SET(stdout_pipe_fd[0],&readfds);
         FD_SET(stderr_pipe_fd[0],&readfds);
-        timeout.tv_sec = 1;
+        timeout.tv_sec = 0;
         timeout.tv_usec = 1;
         select_ret = select(maxfds,&readfds,NULL,NULL,&timeout);
         if(select_ret > 0){
@@ -140,7 +154,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
                 int count = ::read(stdout_pipe_fd[0], (void *)&(stdout_buf[stdout_len]), 4 * 1024); 
                 if (count == 0) {
                     stdout_buf[stdout_len] = '\0';
-                    *stdout_b = stdout_buf;
+                    if (stdout_b != NULL) 
+                        *stdout_b = stdout_buf;
                     stdout_end = true;
                 } else {
                     stdout_len += count;
@@ -153,7 +168,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
                 int count = ::read(stderr_pipe_fd[0], (void *)&(stderr_buf[stderr_len]), 4 * 1024);
                 if (count == 0) {
                     stderr_buf[stderr_len] = '\0';
-                    *stderr_b = stderr_buf;
+                    if (stderr_b != NULL) 
+                        *stderr_b = stderr_buf;
                     stderr_end = true;
                 } else {
                     stderr_len += count;
