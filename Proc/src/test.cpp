@@ -91,6 +91,9 @@ int main(int argc, char *argv[])
             printf("call %s error \n", *it);
         }
     }
+
+    printf("ret %d\n", Procc::system("echo \"hello\""));
+    printf("ret %d\n", Procc::system("exit 15"));
     return 0;
     
 }

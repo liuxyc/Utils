@@ -76,32 +76,35 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
     pid = vfork();
     if (pid == 0)//子进程
     {
-        printf("cmd sub process started\n");
+        ::close(stdout_pipe_fd[0]);
+        ::close(stderr_pipe_fd[0]);
         ::close(STDIN_FILENO);
         if (m_std_out_fd == PROCC_STDOUT_PIPE) {
-            ::close(stdout_pipe_fd[0]);
             if (::dup2(stdout_pipe_fd[1], STDOUT_FILENO) < 0) {
                 printf("dup2 stdout error\n");
                 ::_exit(-1);
             }
         }
-        else if (m_std_out_fd >= 0) {
+        else {
             ::close(stdout_pipe_fd[1]);
-            if (::dup2(m_std_out_fd, STDOUT_FILENO) < 0) {
-                printf("dup2 stdout error\n");
-                ::_exit(-1);
-            }
         }
-
         if (m_std_err_fd == PROCC_STDERR_PIPE) {
-            ::close(stderr_pipe_fd[0]);
             if (::dup2(stderr_pipe_fd[1], STDERR_FILENO) < 0) {
                 printf("dup2 stderr error\n");
                 ::_exit(-1);
             }
         }
-        else if (m_std_err_fd >= 0) {
+        else {
             ::close(stderr_pipe_fd[1]);
+        }
+
+        if (m_std_out_fd >= 0) {
+            if (::dup2(m_std_out_fd, STDOUT_FILENO) < 0) {
+                printf("dup2 stdout error\n");
+                ::_exit(-1);
+            }
+        }
+        if (m_std_err_fd >= 0) {
             if (::dup2(m_std_err_fd, STDERR_FILENO) < 0) {
                 printf("dup2 stderr error\n");
                 ::_exit(-1);
@@ -190,3 +193,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
     printf("Procc %d return\n", ret_pid);
     return status;
 }
+
+int Procc::system(const std::string &cmd) {
+    return ::system(cmd.c_str());
+}
+

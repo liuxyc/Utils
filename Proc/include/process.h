@@ -12,6 +12,7 @@ class Procc
         ~Procc();
         bool run(const std::string &cmd, bool use_shell, const std::string &cwd);
         int communicate(char **stdout_b, char **stderr_b);
+        static int system(const std::string &cmd);
 
     private:
         int stdout_pipe_fd[2];
