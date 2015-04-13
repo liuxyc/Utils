@@ -67,11 +67,15 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
         printf("stdout pipe create error\n");
         return false;
     }
+    fcntl(stdout_pipe_fd[0], F_SETFL, O_NOATIME); 
+    fcntl(stdout_pipe_fd[1], F_SETFL, O_NOATIME); 
     if(::pipe2(stderr_pipe_fd, O_CLOEXEC) < 0)
     {
         printf("stderr pipe create error\n");
         return false;
     }
+    fcntl(stderr_pipe_fd[0], F_SETFL, O_NOATIME); 
+    fcntl(stderr_pipe_fd[1], F_SETFL, O_NOATIME); 
 
     pid = vfork();
     if (pid == 0)//子进程
@@ -123,17 +127,17 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
         //NOTICE:如果execvp失败，这里不调_exit()会惨死哦
         ::_exit(-1);
     }
-    ::close(stdout_pipe_fd[1]);
-    ::close(stderr_pipe_fd[1]);
-    delete [] exe_args;
-    return true;
+    else {
+        ::close(stdout_pipe_fd[1]);
+        ::close(stderr_pipe_fd[1]);
+        delete [] exe_args;
+        return true;
+    }
 }
 
 
 int Procc::communicate(char **stdout_b, char **stderr_b)
 {
-    memset(stdout_buf, 0, PROC_MAX_STDOUT_BUF);
-    memset(stderr_buf, 0, PROC_MAX_STDERR_BUF);
 
     size_t stdout_len = 0;
     size_t stderr_len = 0;
