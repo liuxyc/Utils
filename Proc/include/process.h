@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2014-2015, Xiaoyu Liu <liuxyc at gmail dot com>
+ * All rights reserved.
+ */
+
+#ifndef UTIL_PROC_PROCESS_H
+#define UTIL_PROC_PROCESS_H
+
 #include <string>
 
 const int PROCC_STDOUT_NONE = -1;
@@ -26,4 +34,4 @@ class Procc
         const size_t PROC_MAX_STDOUT_BUF;
         const size_t PROC_MAX_STDERR_BUF;
 };
-
+#endif
