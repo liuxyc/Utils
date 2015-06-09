@@ -19,7 +19,7 @@ class Procc
         Procc(int std_out_fd, int std_err_fd);
         ~Procc();
         bool run(const std::string &cmd, bool use_shell, const std::string &cwd);
-        int communicate(char **stdout_b, char **stderr_b);
+        int communicate(char **stdout_b, char **stderr_b, uint32_t timeout=0);
         static int system(const std::string &cmd);
 
     private:

@@ -17,13 +17,18 @@ int main(int argc, char *argv[])
     vec_cmd.push_back("/bin/ls -a -l");
     vec_cmd.push_back("svn indo");
     vec_cmd.push_back("/bin/notexists -a -l");
+    vec_cmd.push_back("/usr/bin/python -u sleep.py");
     for (auto it = vec_cmd.begin(); it != vec_cmd.end(); ++it) {
-        pp.run(*it, false, "./include");
+        pp.run(*it, false, "./");
         char *stdoutbuf = NULL;
         char *stderrbuf = NULL; 
-        int ret = -1;
-        if ( (ret = pp.communicate(&stdoutbuf, &stderrbuf)) != 0) {
-            printf("call %s error \n", *it);
+        int ret = pp.communicate(&stdoutbuf, &stderrbuf, 3);
+        if ( ret == 9) {
+            printf("call %s timeout\n", *it);
+        }
+
+        if ( ret < 0) {
+            printf("call %s error\n", *it);
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
@@ -41,9 +46,13 @@ int main(int argc, char *argv[])
         pp.run(*it, true, "");
         char *stdoutbuf = NULL;
         char *stderrbuf = NULL;
-        int ret = -1;
-        if ( (ret = pp.communicate(&stdoutbuf, &stderrbuf)) != 0) {
-            printf("call %s error \n", *it);
+        int ret = pp.communicate(&stdoutbuf, &stderrbuf);
+        if ( ret == 9) {
+            printf("call %s timeout\n", *it);
+        }
+
+        if ( ret < 0) {
+            printf("call %s error\n", *it);
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);

@@ -136,7 +136,7 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
 }
 
 
-int Procc::communicate(char **stdout_b, char **stderr_b)
+int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
 {
 
     size_t stdout_len = 0;
@@ -144,18 +144,19 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
     fd_set readfds;
     int maxfds = 0;
     maxfds = std::max(stdout_pipe_fd[0], stderr_pipe_fd[0]) + 1;
-    struct timeval timeout;
-    memset(&timeout, 0, sizeof(struct timeval));
+    struct timeval timeout_s;
+    memset(&timeout_s, 0, sizeof(struct timeval));
     int select_ret = 0;
     FD_ZERO(&readfds);
     bool stdout_end = false;
     bool stderr_end = false;
+    time_t begin_t = time(NULL);
     while(1) {
         FD_SET(stdout_pipe_fd[0],&readfds);
         FD_SET(stderr_pipe_fd[0],&readfds);
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 1;
-        select_ret = select(maxfds,&readfds,NULL,NULL,&timeout);
+        timeout_s.tv_sec = 1;
+        timeout_s.tv_usec = 0;
+        select_ret = select(maxfds,&readfds,NULL,NULL,&timeout_s);
         if(select_ret > 0){
             if(FD_ISSET(stdout_pipe_fd[0], &readfds)){
                 int count = ::read(stdout_pipe_fd[0], (void *)&(stdout_buf[stdout_len]), 4 * 1024); 
@@ -189,12 +190,22 @@ int Procc::communicate(char **stdout_b, char **stderr_b)
                 break;
             }
         } 
-        else {
+        if(timeout > 0) {
+            if(time(NULL) - begin_t >= timeout) {
+                stdout_buf[stdout_len] = '\0';
+                if (stdout_b != NULL) 
+                    *stdout_b = stdout_buf;
+                stderr_buf[stderr_len] = '\0';
+                if (stderr_b != NULL) 
+                    *stderr_b = stderr_buf;
+                kill(pid, 9);
+                break;
+            }
         }
     }
     int status;
     pid_t ret_pid = ::waitpid(pid, &status, 0);
-    printf("Procc %d return\n", ret_pid);
+    printf("Procc %d return %d\n", ret_pid, status);
     return status;
 }
 
