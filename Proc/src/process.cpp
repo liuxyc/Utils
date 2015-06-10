@@ -1,4 +1,7 @@
-#include "process.h"
+/*
+ * Copyright (c) 2014-2015, Xiaoyu Liu <liuxyc at gmail dot com>
+ * All rights reserved.
+ */
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
@@ -10,25 +13,27 @@
 #include <algorithm>
 #include <fcntl.h>
 
-Procc::Procc(int std_out_fd, int std_err_fd)
-: isInit(false)
-, stdout_buf(NULL)
-, stderr_buf(NULL)
+#include "process.h"
+
+Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
+: m_isInit(false)
+, m_stdout_buf(NULL)
+, m_stderr_buf(NULL)
 , m_std_out_fd(std_out_fd)
 , m_std_err_fd(std_err_fd)
-, PROC_MAX_STDOUT_BUF(1024*1024*64)
-, PROC_MAX_STDERR_BUF(1024*1024*64)
+, PROC_MAX_STDOUT_BUF(max_buf_len)
+, PROC_MAX_STDERR_BUF(max_buf_len)
 {
-    isInit = true;
-    stdout_buf = new char[PROC_MAX_STDOUT_BUF];
-    stderr_buf = new char[PROC_MAX_STDERR_BUF];
+    m_isInit = true;
+    m_stdout_buf = new char[PROC_MAX_STDOUT_BUF];
+    m_stderr_buf = new char[PROC_MAX_STDERR_BUF];
 
 }
 
 Procc::~Procc()
 {
-    delete [] stdout_buf;
-    delete [] stderr_buf;
+    delete [] m_stdout_buf;
+    delete [] m_stderr_buf;
 }
 
 bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
@@ -62,44 +67,44 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
             exe_args[1] = NULL;
         }
     }
-    if(::pipe2(stdout_pipe_fd, O_CLOEXEC) < 0)
+    if(::pipe2(m_stdout_pipe_fd, O_CLOEXEC) < 0)
     {
         printf("stdout pipe create error\n");
         return false;
     }
-    fcntl(stdout_pipe_fd[0], F_SETFL, O_NOATIME); 
-    fcntl(stdout_pipe_fd[1], F_SETFL, O_NOATIME); 
-    if(::pipe2(stderr_pipe_fd, O_CLOEXEC) < 0)
+    fcntl(m_stdout_pipe_fd[0], F_SETFL, O_NOATIME); 
+    fcntl(m_stdout_pipe_fd[1], F_SETFL, O_NOATIME); 
+    if(::pipe2(m_stderr_pipe_fd, O_CLOEXEC) < 0)
     {
         printf("stderr pipe create error\n");
         return false;
     }
-    fcntl(stderr_pipe_fd[0], F_SETFL, O_NOATIME); 
-    fcntl(stderr_pipe_fd[1], F_SETFL, O_NOATIME); 
+    fcntl(m_stderr_pipe_fd[0], F_SETFL, O_NOATIME); 
+    fcntl(m_stderr_pipe_fd[1], F_SETFL, O_NOATIME); 
 
-    pid = vfork();
-    if (pid == 0)//子进程
+    m_pid = vfork();
+    if (m_pid == 0)//子进程
     {
-        ::close(stdout_pipe_fd[0]);
-        ::close(stderr_pipe_fd[0]);
+        ::close(m_stdout_pipe_fd[0]);
+        ::close(m_stderr_pipe_fd[0]);
         ::close(STDIN_FILENO);
         if (m_std_out_fd == PROCC_STDOUT_PIPE) {
-            if (::dup2(stdout_pipe_fd[1], STDOUT_FILENO) < 0) {
+            if (::dup2(m_stdout_pipe_fd[1], STDOUT_FILENO) < 0) {
                 printf("dup2 stdout error\n");
                 ::_exit(-1);
             }
         }
         else {
-            ::close(stdout_pipe_fd[1]);
+            ::close(m_stdout_pipe_fd[1]);
         }
         if (m_std_err_fd == PROCC_STDERR_PIPE) {
-            if (::dup2(stderr_pipe_fd[1], STDERR_FILENO) < 0) {
+            if (::dup2(m_stderr_pipe_fd[1], STDERR_FILENO) < 0) {
                 printf("dup2 stderr error\n");
                 ::_exit(-1);
             }
         }
         else {
-            ::close(stderr_pipe_fd[1]);
+            ::close(m_stderr_pipe_fd[1]);
         }
 
         if (m_std_out_fd >= 0) {
@@ -128,8 +133,8 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
         ::_exit(-1);
     }
     else {
-        ::close(stdout_pipe_fd[1]);
-        ::close(stderr_pipe_fd[1]);
+        ::close(m_stdout_pipe_fd[1]);
+        ::close(m_stderr_pipe_fd[1]);
         delete [] exe_args;
         return true;
     }
@@ -143,7 +148,7 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
     size_t stderr_len = 0;
     fd_set readfds;
     int maxfds = 0;
-    maxfds = std::max(stdout_pipe_fd[0], stderr_pipe_fd[0]) + 1;
+    maxfds = std::max(m_stdout_pipe_fd[0], m_stderr_pipe_fd[0]) + 1;
     struct timeval timeout_s;
     memset(&timeout_s, 0, sizeof(struct timeval));
     int select_ret = 0;
@@ -152,18 +157,18 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
     bool stderr_end = false;
     time_t begin_t = time(NULL);
     while(1) {
-        FD_SET(stdout_pipe_fd[0],&readfds);
-        FD_SET(stderr_pipe_fd[0],&readfds);
+        FD_SET(m_stdout_pipe_fd[0],&readfds);
+        FD_SET(m_stderr_pipe_fd[0],&readfds);
         timeout_s.tv_sec = 1;
         timeout_s.tv_usec = 0;
         select_ret = select(maxfds,&readfds,NULL,NULL,&timeout_s);
         if(select_ret > 0){
-            if(FD_ISSET(stdout_pipe_fd[0], &readfds)){
-                int count = ::read(stdout_pipe_fd[0], (void *)&(stdout_buf[stdout_len]), 4 * 1024); 
+            if(FD_ISSET(m_stdout_pipe_fd[0], &readfds)){
+                int count = ::read(m_stdout_pipe_fd[0], (void *)&(m_stdout_buf[stdout_len]), 4 * 1024); 
                 if (count == 0) {
-                    stdout_buf[stdout_len] = '\0';
+                    m_stdout_buf[stdout_len] = '\0';
                     if (stdout_b != NULL) 
-                        *stdout_b = stdout_buf;
+                        *stdout_b = m_stdout_buf;
                     stdout_end = true;
                 } else {
                     stdout_len += count;
@@ -172,12 +177,12 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
                     }
                 }
             }
-            if(FD_ISSET(stderr_pipe_fd[0], &readfds)){
-                int count = ::read(stderr_pipe_fd[0], (void *)&(stderr_buf[stderr_len]), 4 * 1024);
+            if(FD_ISSET(m_stderr_pipe_fd[0], &readfds)){
+                int count = ::read(m_stderr_pipe_fd[0], (void *)&(m_stderr_buf[stderr_len]), 4 * 1024);
                 if (count == 0) {
-                    stderr_buf[stderr_len] = '\0';
+                    m_stderr_buf[stderr_len] = '\0';
                     if (stderr_b != NULL) 
-                        *stderr_b = stderr_buf;
+                        *stderr_b = m_stderr_buf;
                     stderr_end = true;
                 } else {
                     stderr_len += count;
@@ -192,19 +197,19 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
         } 
         if(timeout > 0) {
             if(time(NULL) - begin_t >= timeout) {
-                stdout_buf[stdout_len] = '\0';
+                m_stdout_buf[stdout_len] = '\0';
                 if (stdout_b != NULL) 
-                    *stdout_b = stdout_buf;
-                stderr_buf[stderr_len] = '\0';
+                    *stdout_b = m_stdout_buf;
+                m_stderr_buf[stderr_len] = '\0';
                 if (stderr_b != NULL) 
-                    *stderr_b = stderr_buf;
-                kill(pid, 9);
+                    *stderr_b = m_stderr_buf;
+                kill(m_pid, 9);
                 break;
             }
         }
     }
     int status;
-    pid_t ret_pid = ::waitpid(pid, &status, 0);
+    pid_t ret_pid = ::waitpid(m_pid, &status, 0);
     printf("Procc %d return %d\n", ret_pid, status);
     return status;
 }
