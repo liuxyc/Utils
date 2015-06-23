@@ -9,14 +9,18 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>    
+#include <boost/filesystem.hpp>    
 #include <vector>
 #include <algorithm>
 #include <fcntl.h>
+#include <string>
+#include <fstream>
 
 #include "process.h"
 
 Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
-: m_isInit(false)
+: m_pid(-1)
+, m_isInit(false)
 , m_stdout_buf(NULL)
 , m_stderr_buf(NULL)
 , m_std_out_fd(std_out_fd)
@@ -140,6 +144,27 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
     }
 }
 
+int Procc::pid() 
+{
+    return m_pid;
+}
+
+bool Procc::is_alive(pid_t pid)
+{
+    boost::filesystem::path proc_path = std::string("/proc/") + std::to_string(pid);
+    if (boost::filesystem::exists(proc_path)) {
+        proc_path /= "stat";
+        std::ifstream proc_st_file(proc_path.string());
+        if (proc_st_file.is_open()) {
+            std::string pid, st_str, st;
+            proc_st_file >> pid >> st_str >> st;
+            if (st != "Z") {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
 {
@@ -164,7 +189,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
         select_ret = select(maxfds,&readfds,NULL,NULL,&timeout_s);
         if(select_ret > 0){
             if(FD_ISSET(m_stdout_pipe_fd[0], &readfds)){
-                int count = ::read(m_stdout_pipe_fd[0], (void *)&(m_stdout_buf[stdout_len]), 4 * 1024); 
+                int stdout_read_len = PROC_MAX_STDOUT_BUF - stdout_len;
+                int count = ::read(m_stdout_pipe_fd[0], &m_stdout_buf[stdout_len], stdout_read_len); 
                 if (count == 0) {
                     m_stdout_buf[stdout_len] = '\0';
                     if (stdout_b != NULL) 
@@ -178,7 +204,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
                 }
             }
             if(FD_ISSET(m_stderr_pipe_fd[0], &readfds)){
-                int count = ::read(m_stderr_pipe_fd[0], (void *)&(m_stderr_buf[stderr_len]), 4 * 1024);
+                int stderr_read_len = PROC_MAX_STDERR_BUF - stderr_len;
+                int count = ::read(m_stderr_pipe_fd[0], &m_stderr_buf[stderr_len], stderr_read_len);
                 if (count == 0) {
                     m_stderr_buf[stderr_len] = '\0';
                     if (stderr_b != NULL) 
@@ -211,6 +238,7 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
     int status;
     pid_t ret_pid = ::waitpid(m_pid, &status, 0);
     printf("Procc %d return %d\n", ret_pid, status);
+    m_pid = -1;
     return status;
 }
 

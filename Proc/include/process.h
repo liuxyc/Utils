@@ -24,7 +24,7 @@ class Procc
          * @param std_err_fd
          * @param max_buf_len init buffer for stdout/stderr data will overlap if larger than buffer
          */
-        Procc(int std_out_fd, int std_err_fd, size_t max_buf_len=4*1024);
+        Procc(int std_out_fd, int std_err_fd, size_t max_buf_len=8*1024);
 
         ~Procc();
         /**
@@ -48,6 +48,23 @@ class Procc
          * @return 
          */
         int communicate(char **stdout_b, char **stderr_b, uint32_t timeout=0);
+
+        /**
+         * @brief get surrent running process id
+         *
+         * @return 
+         */
+        pid_t pid();
+
+        /**
+         * @brief return is process alive
+         *
+         * @param pid specify pid
+         *
+         * @return 
+         */
+        static bool is_alive(pid_t pid);
+
         static int system(const std::string &cmd);
 
     private:

@@ -101,6 +101,13 @@ int main(int argc, char *argv[])
         }
     }
 
+    pp.run("sleep 5", false, "");
+    while(pp.is_alive(pp.pid())) {
+        printf("%d alive\n", pp.pid());
+        sleep(1);
+    }
+    pp.communicate(NULL, NULL);
+
     printf("ret %d\n", Procc::system("echo \"hello\""));
     printf("ret %d\n", Procc::system("exit 15"));
     return 0;
