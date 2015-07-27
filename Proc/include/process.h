@@ -78,5 +78,7 @@ class Procc
         int m_std_err_fd;
         const size_t PROC_MAX_STDOUT_BUF;
         const size_t PROC_MAX_STDERR_BUF;
+
+        int _stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, char **std_b, bool &is_end);
 };
 #endif

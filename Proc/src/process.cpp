@@ -166,6 +166,23 @@ bool Procc::is_alive(pid_t pid)
     return false;
 }
 
+int Procc::_stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, char **std_b, bool &is_end) {
+    int std_read_len = max_buf_len - buflen;
+    int count = ::read(pipe_fd, &buf[buflen], std_read_len); 
+    if (count == 0) {
+        buf[buflen] = '\0';
+        if (std_b != NULL) 
+            *std_b = buf;
+        is_end = true;
+    } else {
+        buflen += count;
+        if (buflen >= max_buf_len) {
+            buflen = 0;
+        }
+    }
+    return 0;
+}
+
 int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
 {
 
@@ -189,34 +206,10 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
         select_ret = select(maxfds,&readfds,NULL,NULL,&timeout_s);
         if(select_ret > 0){
             if(FD_ISSET(m_stdout_pipe_fd[0], &readfds)){
-                int stdout_read_len = PROC_MAX_STDOUT_BUF - stdout_len;
-                int count = ::read(m_stdout_pipe_fd[0], &m_stdout_buf[stdout_len], stdout_read_len); 
-                if (count == 0) {
-                    m_stdout_buf[stdout_len] = '\0';
-                    if (stdout_b != NULL) 
-                        *stdout_b = m_stdout_buf;
-                    stdout_end = true;
-                } else {
-                    stdout_len += count;
-                    if (stdout_len >= PROC_MAX_STDOUT_BUF) {
-                        stdout_len = 0;
-                    }
-                }
+                _stdread(m_stdout_pipe_fd[0], m_stdout_buf, stdout_len, PROC_MAX_STDOUT_BUF, stdout_b, stdout_end);
             }
             if(FD_ISSET(m_stderr_pipe_fd[0], &readfds)){
-                int stderr_read_len = PROC_MAX_STDERR_BUF - stderr_len;
-                int count = ::read(m_stderr_pipe_fd[0], &m_stderr_buf[stderr_len], stderr_read_len);
-                if (count == 0) {
-                    m_stderr_buf[stderr_len] = '\0';
-                    if (stderr_b != NULL) 
-                        *stderr_b = m_stderr_buf;
-                    stderr_end = true;
-                } else {
-                    stderr_len += count;
-                    if (stderr_len >= PROC_MAX_STDERR_BUF) {
-                        stderr_len = 0;
-                    }
-                }
+                _stdread(m_stderr_pipe_fd[0], m_stderr_buf, stderr_len, PROC_MAX_STDERR_BUF, stderr_b, stderr_end);
             }
             if (stdout_end && stderr_end) {
                 break;
