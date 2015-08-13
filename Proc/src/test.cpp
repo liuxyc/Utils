@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <cassert>
 
 
 int main(int argc, char *argv[])
@@ -81,7 +82,6 @@ int main(int argc, char *argv[])
     }
 
     int out_fd = open("./outout", O_WRONLY|O_CREAT, 0644);
-
     Procc pp_fd(out_fd, out_fd);
     for (auto it = vec_cmdn.begin(); it != vec_cmdn.end(); ++it) {
         pp_fd.run(*it, false, "./include");
@@ -108,8 +108,14 @@ int main(int argc, char *argv[])
     }
     pp.communicate(NULL, NULL);
 
-    printf("ret %d\n", Procc::system("echo \"hello\""));
-    printf("ret %d\n", Procc::system("exit 15"));
+
+    time_t begin_t = time(NULL);
+    pp.run("sleep 1", false, "");
+    pp.communicate(NULL, NULL, 5);
+    assert(time(NULL) - begin_t == 1);
+
+    assert(Procc::system("echo \"hello\"") == 0);
+    assert(Procc::system("exit 15") == 3840);
     return 0;
     
 }
