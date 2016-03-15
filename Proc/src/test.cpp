@@ -6,12 +6,23 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <cassert>
+#include <utility>
 
 
 int main(int argc, char *argv[])
 {
+    PerfResults pppa(getpid(), 1);
+    for(auto i = 0; i < 3; ++i) {
+      pppa.collect();
+      for(auto &pd: pppa.m_sample_data) {
+        printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+      }
+      printf("------\n");
+      sleep(1);
+    }
     
     Procc pp(PROCC_STDOUT_PIPE, PROCC_STDERR_PIPE);
+    pp.setCollectPerf(10);
     std::vector<const char *> vec_cmd;
     vec_cmd.push_back("/sbin/ifconfig");
     vec_cmd.push_back("/sbin/ifconfig -a");
@@ -101,6 +112,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    pp.setCollectPerf(0);
     pp.run("sleep 5", false, "");
     while(pp.is_alive(pp.pid())) {
         printf("%d alive\n", pp.pid());

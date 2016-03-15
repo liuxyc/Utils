@@ -27,17 +27,21 @@ Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
 , m_std_err_fd(std_err_fd)
 , PROC_MAX_STDOUT_BUF(max_buf_len)
 , PROC_MAX_STDERR_BUF(max_buf_len)
+, m_collect_num(0)
+, m_collector(nullptr)
 {
     m_isInit = true;
     m_stdout_buf = new char[PROC_MAX_STDOUT_BUF];
     m_stderr_buf = new char[PROC_MAX_STDERR_BUF];
-
 }
 
 Procc::~Procc()
 {
     delete [] m_stdout_buf;
     delete [] m_stderr_buf;
+    if(m_collector) {
+      delete m_collector;
+    }
 }
 
 bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
@@ -74,6 +78,9 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
     if(::pipe2(m_stdout_pipe_fd, O_CLOEXEC) < 0)
     {
         printf("stdout pipe create error\n");
+        if(exe_args) {
+          delete [] exe_args;
+        }
         return false;
     }
     fcntl(m_stdout_pipe_fd[0], F_SETFL, O_NOATIME); 
@@ -81,6 +88,9 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
     if(::pipe2(m_stderr_pipe_fd, O_CLOEXEC) < 0)
     {
         printf("stderr pipe create error\n");
+        if(exe_args) {
+          delete [] exe_args;
+        }
         return false;
     }
     fcntl(m_stderr_pipe_fd[0], F_SETFL, O_NOATIME); 
@@ -127,7 +137,7 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
             int ret = chdir(cwd.c_str());
             if (ret != 0) {
                 printf("chdir to %s error \n", cwd.c_str());
-                return false;
+                ::_exit(-1);
             }
         }
 
@@ -151,19 +161,20 @@ int Procc::pid()
 
 bool Procc::is_alive(pid_t pid)
 {
-    boost::filesystem::path proc_path = std::string("/proc/") + std::to_string(pid);
-    if (boost::filesystem::exists(proc_path)) {
-        proc_path /= "stat";
-        std::ifstream proc_st_file(proc_path.string());
-        if (proc_st_file.is_open()) {
-            std::string pid, st_str, st;
-            proc_st_file >> pid >> st_str >> st;
-            if (st != "Z") {
-                return true;
-            }
-        }
+  std::string proc_path("/proc/");
+  proc_path += std::to_string(pid);
+  if (boost::filesystem::exists(proc_path)) {
+    proc_path += "/stat";
+    std::ifstream proc_st_file(proc_path);
+    if (proc_st_file.is_open()) {
+      std::string pid, st_str, st;
+      proc_st_file >> pid >> st_str >> st;
+      if (st != "Z") {
+        return true;
+      }
     }
-    return false;
+  }
+  return false;
 }
 
 int Procc::_stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, char **std_b, bool &is_end) {
@@ -227,6 +238,20 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
                 break;
             }
         }
+        if(m_collector == nullptr) {
+            if (m_collect_num != 0) {
+              m_collector = new PerfResults(m_pid, m_collect_num);
+            }
+        }
+        else {
+            if (m_collect_num == 0) {
+              delete m_collector;
+              m_collector = nullptr;
+            }
+            else {
+              m_collector->collect();
+            }
+        }
     }
     int status;
     pid_t ret_pid = ::waitpid(m_pid, &status, 0);
@@ -239,3 +264,71 @@ int Procc::system(const std::string &cmd) {
     return ::system(cmd.c_str());
 }
 
+void Procc::setCollectPerf(size_t data_num) {
+  m_collect_num = data_num;
+}
+
+PerfResults::PerfResults(pid_t pid, size_t max_sample_num)
+: m_sample_data(max_sample_num)
+, m_pid(pid)
+, m_max_sample_num(max_sample_num)
+, m_cur_sample_pos(0)
+, m_total_sys_cpu(0)
+, m_total_proc_cpu(0)
+{
+  m_sample_data.reserve(max_sample_num);
+  m_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+  m_page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
+}
+
+PerfResults::~PerfResults() {
+}
+
+void PerfResults::collect()
+{
+  if (m_start_time == 0) {
+    m_start_time = std::time(nullptr);
+  }
+  float cpu = -1.0;
+  uint64_t mem = 0;
+
+  std::string useless;
+  std::ifstream sys_stat_file("/proc/stat");
+
+  std::string proc_path("/proc/");
+  proc_path += std::to_string(m_pid);
+
+  std::ifstream proc_st_file(proc_path + "/stat");
+  std::ifstream proc_stm_file(proc_path + "/statm");
+
+  if (sys_stat_file.is_open() && boost::filesystem::exists(proc_path) 
+      && proc_st_file.is_open() && proc_stm_file.is_open()) {
+    uint64_t sys_total = 0;
+    std::string xtime;
+    sys_stat_file >> useless;
+    for(auto c = 0; c < 10; ++c) {
+      sys_stat_file >> xtime;
+      sys_total += std::stoll(xtime);
+    }
+    std::string str_utime, str_stime;
+    for (auto c = 0; c < 13; ++c) {
+      proc_st_file >> useless;
+    }
+    proc_st_file >> str_utime;
+    proc_st_file >> str_stime;
+    uint64_t p_utime = std::stoll(str_utime);
+    uint64_t p_stime = std::stoll(str_stime);
+    cpu = 100 * m_cpu_count * (p_utime + p_stime - m_total_proc_cpu) / (sys_total - m_total_sys_cpu);
+
+    std::string str_resident;
+    proc_stm_file >> useless;
+    proc_stm_file >> str_resident;
+    mem = std::stoll(str_resident) * m_page_size_kb;
+
+    std::get<0>(m_sample_data[m_cur_sample_pos % m_max_sample_num]) = cpu;
+    std::get<1>(m_sample_data[m_cur_sample_pos % m_max_sample_num]) = mem;
+    m_total_sys_cpu = sys_total;
+    m_total_proc_cpu = p_utime + p_stime;
+  }
+  ++m_cur_sample_pos;
+}
