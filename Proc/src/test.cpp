@@ -11,11 +11,11 @@
 
 int main(int argc, char *argv[])
 {
-    PerfResults pppa(getpid(), 1);
+    PerfCollector pppa(getpid(), 1);
     for(auto i = 0; i < 3; ++i) {
       pppa.collect();
       for(auto &pd: pppa.m_sample_data) {
-        printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+        printf("PerfCollector test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
       }
       printf("------\n");
       sleep(1);
@@ -45,9 +45,9 @@ int main(int argc, char *argv[])
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
-        const PerfResults *pr = pp.getCollector();
+        std::shared_ptr<PerfCollector> pr = pp.getCollector();
         for(auto &pd: pr->m_sample_data) {
-          printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+          printf("PerfCollector test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
         }
         printf("------\n");
     }
@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
-        const PerfResults *pr = pp.getCollector();
+        std::shared_ptr<PerfCollector> pr = pp.getCollector();
         for(auto &pd: pr->m_sample_data) {
-          printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+          printf("PerfCollector test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
         }
         printf("------\n");
     }

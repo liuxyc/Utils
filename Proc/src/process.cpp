@@ -38,9 +38,6 @@ Procc::~Procc()
 {
     delete [] m_stdout_buf;
     delete [] m_stderr_buf;
-    if(m_collector) {
-      delete m_collector;
-    }
 }
 
 bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
@@ -209,7 +206,7 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout, size_
     bool stderr_end = false;
     time_t begin_time = time(NULL);
     if(m_collector == nullptr) {
-      m_collector = new PerfResults(m_pid, collectNum);
+      m_collector.reset(new PerfCollector(m_pid, collectNum));
     }
     else {
       m_collector->setSample(m_pid, collectNum);
@@ -258,7 +255,7 @@ int Procc::system(const std::string &cmd) {
     return ::system(cmd.c_str());
 }
 
-PerfResults::PerfResults(pid_t pid, size_t max_sample_num)
+PerfCollector::PerfCollector(pid_t pid, size_t max_sample_num)
 : m_sample_data(max_sample_num)
 , m_pid(pid)
 , m_max_sample_num(max_sample_num)
@@ -270,11 +267,11 @@ PerfResults::PerfResults(pid_t pid, size_t max_sample_num)
   m_page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
 }
 
-PerfResults::~PerfResults() {
+PerfCollector::~PerfCollector() {
 }
 
 
-void PerfResults::setSample(pid_t pid, size_t num) {
+void PerfCollector::setSample(pid_t pid, size_t num) {
   m_pid = pid;
   m_cur_sample_pos = 0;
   m_max_sample_num = num;
@@ -282,7 +279,7 @@ void PerfResults::setSample(pid_t pid, size_t num) {
   m_sample_data.resize(num);
 }
 
-void PerfResults::collect()
+void PerfCollector::collect()
 {
   if (m_start_time == 0) {
     m_start_time = std::time(nullptr);

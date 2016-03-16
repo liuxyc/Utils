@@ -10,13 +10,14 @@
 #include <tuple>
 #include <vector>
 #include <ctime>
+#include <memory>
 
 const int PROCC_STDOUT_NONE = -1;
 const int PROCC_STDOUT_PIPE = -2;
 const int PROCC_STDERR_NONE = -1;
 const int PROCC_STDERR_PIPE = -2;
 
-class PerfResults;
+class PerfCollector;
 
 class Procc
 {
@@ -50,7 +51,7 @@ class Procc
          * @param stderr_b
          * @param timeout
          * @param data_num   set the collection data number, sample interval is 1 second
-         *            will put PerfPoint into vector PerfResults::m_sample_data
+         *            will put PerfPoint into vector PerfCollector::m_sample_data
          *            >0 enable, =0 disable
          *
          * @return 
@@ -64,7 +65,7 @@ class Procc
          */
         pid_t pid();
 
-        const PerfResults *getCollector() {return m_collector;};
+        std::shared_ptr<PerfCollector> getCollector() {return m_collector;};
 
         /**
          * @brief return is process alive
@@ -90,16 +91,16 @@ class Procc
         const size_t PROC_MAX_STDERR_BUF;
 
         int _stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, char **std_b, bool &is_end);
-        PerfResults *m_collector;
+        std::shared_ptr<PerfCollector> m_collector;
 };
 
-class PerfResults
+class PerfCollector
 {
   //sample interval is fixed to 1 second
   typedef std::tuple<float, uint64_t> PerfPoint;
   public:
-    explicit PerfResults(pid_t pid, size_t max_sample_num);
-    ~PerfResults();
+    explicit PerfCollector(pid_t pid, size_t max_sample_num);
+    ~PerfCollector();
     void collect();
     void setSample(pid_t pid, size_t num);
 
@@ -107,8 +108,8 @@ class PerfResults
     
     std::vector<PerfPoint> m_sample_data;
 
-    PerfResults(const PerfResults &) = delete;
-    PerfResults &operator=(const PerfResults &) = delete;
+    PerfCollector(const PerfCollector &) = delete;
+    PerfCollector &operator=(const PerfCollector &) = delete;
   private:
     pid_t m_pid;
     size_t m_max_sample_num;
