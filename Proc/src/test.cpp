@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
     }
     
     Procc pp(PROCC_STDOUT_PIPE, PROCC_STDERR_PIPE);
-    pp.setCollectPerf(10);
     std::vector<const char *> vec_cmd;
     vec_cmd.push_back("/sbin/ifconfig");
     vec_cmd.push_back("/sbin/ifconfig -a");
@@ -30,11 +29,13 @@ int main(int argc, char *argv[])
     vec_cmd.push_back("svn indo");
     vec_cmd.push_back("/bin/notexists -a -l");
     vec_cmd.push_back("/usr/bin/python -u sleep.py");
+    vec_cmd.push_back("/usr/bin/python -u busy.py");
+    size_t collect_size = 0;
     for (auto it = vec_cmd.begin(); it != vec_cmd.end(); ++it) {
         pp.run(*it, false, "./");
         char *stdoutbuf = NULL;
         char *stderrbuf = NULL; 
-        int ret = pp.communicate(&stdoutbuf, &stderrbuf, 3);
+        int ret = pp.communicate(&stdoutbuf, &stderrbuf, 5, collect_size++);
         if ( ret == 9) {
             printf("call %s timeout\n", *it);
         }
@@ -44,6 +45,11 @@ int main(int argc, char *argv[])
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
+        const PerfResults *pr = pp.getCollector();
+        for(auto &pd: pr->m_sample_data) {
+          printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+        }
+        printf("------\n");
     }
 
     std::vector<const char *> vec_cmd_shell;
@@ -54,11 +60,12 @@ int main(int argc, char *argv[])
     vec_cmd_shell.push_back("ls -a -l");
     vec_cmd_shell.push_back("unkonw -a -l");
     vec_cmd_shell.push_back("python ./largeout.py");
+    collect_size = 10;
     for (auto it = vec_cmd_shell.begin(); it != vec_cmd_shell.end(); ++it) {
         pp.run(*it, true, "");
         char *stdoutbuf = NULL;
         char *stderrbuf = NULL;
-        int ret = pp.communicate(&stdoutbuf, &stderrbuf);
+        int ret = pp.communicate(&stdoutbuf, &stderrbuf, 2, collect_size--);
         if ( ret == 9) {
             printf("call %s timeout\n", *it);
         }
@@ -68,6 +75,11 @@ int main(int argc, char *argv[])
         }
         printf("stdout %s\n", stdoutbuf);
         printf("stderr %s\n", stderrbuf);
+        const PerfResults *pr = pp.getCollector();
+        for(auto &pd: pr->m_sample_data) {
+          printf("PerfResults test cpu:%f RES:%lu\n", std::get<0>(pd), std::get<1>(pd));
+        }
+        printf("------\n");
     }
 
     Procc pp_none(PROCC_STDOUT_NONE, PROCC_STDERR_NONE);
@@ -112,7 +124,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    pp.setCollectPerf(0);
     pp.run("sleep 5", false, "");
     while(pp.is_alive(pp.pid())) {
         printf("%d alive\n", pp.pid());

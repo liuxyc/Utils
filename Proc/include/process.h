@@ -49,10 +49,13 @@ class Procc
          * @param stdout_b
          * @param stderr_b
          * @param timeout
+         * @param data_num   set the collection data number, sample interval is 1 second
+         *            will put PerfPoint into vector PerfResults::m_sample_data
+         *            >0 enable, =0 disable
          *
          * @return 
          */
-        int communicate(char **stdout_b, char **stderr_b, uint32_t timeout=0);
+        int communicate(char **stdout_b, char **stderr_b, uint32_t timeout = 0, size_t collectNum = 0);
 
         /**
          * @brief get surrent running process id
@@ -60,6 +63,8 @@ class Procc
          * @return 
          */
         pid_t pid();
+
+        const PerfResults *getCollector() {return m_collector;};
 
         /**
          * @brief return is process alive
@@ -71,13 +76,6 @@ class Procc
         static bool is_alive(pid_t pid);
 
         static int system(const std::string &cmd);
-
-        /* enable/disable process performance data collection
-         * data_num   set the collection data number, sample interval is 1 second
-         *            will put PerfPoint into vector PerfResults::m_sample_data
-         *            >0 enable, =0 disable
-         */
-        void setCollectPerf(size_t data_num);
 
     private:
         int m_stdout_pipe_fd[2];
@@ -92,7 +90,6 @@ class Procc
         const size_t PROC_MAX_STDERR_BUF;
 
         int _stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, char **std_b, bool &is_end);
-        size_t m_collect_num;
         PerfResults *m_collector;
 };
 
@@ -104,6 +101,7 @@ class PerfResults
     explicit PerfResults(pid_t pid, size_t max_sample_num);
     ~PerfResults();
     void collect();
+    void setSample(pid_t pid, size_t num);
 
     std::time_t m_start_time = 0;
     

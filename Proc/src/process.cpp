@@ -27,7 +27,6 @@ Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
 , m_std_err_fd(std_err_fd)
 , PROC_MAX_STDOUT_BUF(max_buf_len)
 , PROC_MAX_STDERR_BUF(max_buf_len)
-, m_collect_num(0)
 , m_collector(nullptr)
 {
     m_isInit = true;
@@ -194,7 +193,7 @@ int Procc::_stdread(int pipe_fd, char *buf, size_t &buflen, size_t max_buf_len, 
     return 0;
 }
 
-int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
+int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout, size_t collectNum)
 {
 
     size_t stdout_len = 0;
@@ -208,7 +207,13 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
     FD_ZERO(&readfds);
     bool stdout_end = false;
     bool stderr_end = false;
-    time_t begin_t = time(NULL);
+    time_t begin_time = time(NULL);
+    if(m_collector == nullptr) {
+      m_collector = new PerfResults(m_pid, collectNum);
+    }
+    else {
+      m_collector->setSample(m_pid, collectNum);
+    }
     while(1) {
         FD_SET(m_stdout_pipe_fd[0],&readfds);
         FD_SET(m_stderr_pipe_fd[0],&readfds);
@@ -227,7 +232,7 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
             }
         } 
         if(timeout > 0) {
-            if(time(NULL) - begin_t >= timeout) {
+            if(time(NULL) - begin_time >= timeout) {
                 m_stdout_buf[stdout_len] = '\0';
                 if (stdout_b != NULL) 
                     *stdout_b = m_stdout_buf;
@@ -238,19 +243,8 @@ int Procc::communicate(char **stdout_b, char **stderr_b, uint32_t timeout)
                 break;
             }
         }
-        if(m_collector == nullptr) {
-            if (m_collect_num != 0) {
-              m_collector = new PerfResults(m_pid, m_collect_num);
-            }
-        }
-        else {
-            if (m_collect_num == 0) {
-              delete m_collector;
-              m_collector = nullptr;
-            }
-            else {
-              m_collector->collect();
-            }
+        if(m_collector && collectNum > 0) {
+          m_collector->collect();
         }
     }
     int status;
@@ -264,10 +258,6 @@ int Procc::system(const std::string &cmd) {
     return ::system(cmd.c_str());
 }
 
-void Procc::setCollectPerf(size_t data_num) {
-  m_collect_num = data_num;
-}
-
 PerfResults::PerfResults(pid_t pid, size_t max_sample_num)
 : m_sample_data(max_sample_num)
 , m_pid(pid)
@@ -276,12 +266,20 @@ PerfResults::PerfResults(pid_t pid, size_t max_sample_num)
 , m_total_sys_cpu(0)
 , m_total_proc_cpu(0)
 {
-  m_sample_data.reserve(max_sample_num);
   m_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
   m_page_size_kb = sysconf(_SC_PAGESIZE) / 1024;
 }
 
 PerfResults::~PerfResults() {
+}
+
+
+void PerfResults::setSample(pid_t pid, size_t num) {
+  m_pid = pid;
+  m_cur_sample_pos = 0;
+  m_max_sample_num = num;
+  m_sample_data.clear();
+  m_sample_data.resize(num);
 }
 
 void PerfResults::collect()
@@ -318,7 +316,12 @@ void PerfResults::collect()
     proc_st_file >> str_stime;
     uint64_t p_utime = std::stoll(str_utime);
     uint64_t p_stime = std::stoll(str_stime);
-    cpu = 100 * m_cpu_count * (p_utime + p_stime - m_total_proc_cpu) / (sys_total - m_total_sys_cpu);
+    if (sys_total != m_total_sys_cpu) {
+      cpu = 100 * m_cpu_count * (p_utime + p_stime - m_total_proc_cpu) / (sys_total - m_total_sys_cpu);
+    }
+    else {
+      cpu = 0;
+    }
 
     std::string str_resident;
     proc_stm_file >> useless;
@@ -329,6 +332,9 @@ void PerfResults::collect()
     std::get<1>(m_sample_data[m_cur_sample_pos % m_max_sample_num]) = mem;
     m_total_sys_cpu = sys_total;
     m_total_proc_cpu = p_utime + p_stime;
+  }
+  else {
+    printf("get stat file error\n");
   }
   ++m_cur_sample_pos;
 }
