@@ -8,7 +8,7 @@
 
 #include <string>
 #include <tuple>
-#include <vector>
+#include <deque>
 #include <ctime>
 #include <memory>
 
@@ -97,6 +97,7 @@ class Procc
 class PerfCollector
 {
   //sample interval is fixed to 1 second
+  //cpu(%), mem(bytes)
   typedef std::tuple<float, uint64_t> PerfPoint;
   public:
     explicit PerfCollector(pid_t pid, size_t max_sample_num);
@@ -106,7 +107,7 @@ class PerfCollector
 
     std::time_t m_start_time = 0;
     
-    std::vector<PerfPoint> m_sample_data;
+    std::deque<PerfPoint> m_sample_data;
 
     PerfCollector(const PerfCollector &) = delete;
     PerfCollector &operator=(const PerfCollector &) = delete;

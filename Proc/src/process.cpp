@@ -256,8 +256,7 @@ int Procc::system(const std::string &cmd) {
 }
 
 PerfCollector::PerfCollector(pid_t pid, size_t max_sample_num)
-: m_sample_data(max_sample_num)
-, m_pid(pid)
+: m_pid(pid)
 , m_max_sample_num(max_sample_num)
 , m_cur_sample_pos(0)
 , m_total_sys_cpu(0)
@@ -275,8 +274,10 @@ void PerfCollector::setSample(pid_t pid, size_t num) {
   m_pid = pid;
   m_cur_sample_pos = 0;
   m_max_sample_num = num;
-  m_sample_data.clear();
-  m_sample_data.resize(num);
+  while (m_sample_data.size() > m_max_sample_num && m_max_sample_num != 0) {
+    m_sample_data.pop_front();
+  }
+  m_sample_data.shrink_to_fit();
 }
 
 void PerfCollector::collect()
@@ -324,9 +325,11 @@ void PerfCollector::collect()
     proc_stm_file >> useless;
     proc_stm_file >> str_resident;
     mem = std::stoll(str_resident) * m_page_size_kb;
+    m_sample_data.emplace_back(cpu,mem);
+    if (m_sample_data.size() > m_max_sample_num) {
+      m_sample_data.pop_front();
+    }
 
-    std::get<0>(m_sample_data[m_cur_sample_pos % m_max_sample_num]) = cpu;
-    std::get<1>(m_sample_data[m_cur_sample_pos % m_max_sample_num]) = mem;
     m_total_sys_cpu = sys_total;
     m_total_proc_cpu = p_utime + p_stime;
   }
