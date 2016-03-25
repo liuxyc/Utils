@@ -11,6 +11,12 @@
 
 int main(int argc, char *argv[])
 {
+    const char *cmdd = " 1 2 3 asd  34 23 !@  1  1 ";
+    std::vector<std::string> vec_cmdd;
+    split_arg(vec_cmdd, cmdd, " ");
+    for(auto &s: vec_cmdd) {
+      std::cout << s << std::endl;
+    }
     PerfCollector pppa(getpid(), 1);
     for(auto i = 0; i < 3; ++i) {
       pppa.collect();

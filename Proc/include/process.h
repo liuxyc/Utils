@@ -18,6 +18,7 @@ const int PROCC_STDERR_NONE = -1;
 const int PROCC_STDERR_PIPE = -2;
 
 extern bool canAccess(const char *file_path);
+extern void split_arg(std::vector<std::string> &str_vec, const char *str, const char *sep);
 
 class PerfCollector;
 

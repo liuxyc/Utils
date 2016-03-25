@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/wait.h>
-#include <boost/algorithm/string.hpp>    
 #include <vector>
 #include <algorithm>
 #include <fcntl.h>
@@ -23,6 +22,27 @@ bool canAccess(const char *file_path)
     return true;
   }
   return false;
+}
+
+
+void split_arg(std::vector<std::string> &str_vec, const char *str, const char *sep)
+{
+  if(str == nullptr)
+    return;
+  std::string input(str);
+  std::string::size_type begin = 0;
+  std::string::size_type p = 0;
+  while( (p = input.find(sep, begin)) != std::string::npos) {
+    if( p == begin) {
+      ++begin;
+      continue;
+    }
+    str_vec.emplace_back(input, begin, p - begin);
+    begin = p + 1;
+  }
+  if (begin != input.size() + 1) {
+    str_vec.emplace_back(input, begin);
+  }
 }
 
 Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
@@ -61,7 +81,7 @@ bool Procc::run(const std::string &cmd, bool use_shell, const std::string &cwd)
         exe_args[3] = NULL;
     }
     else {
-        boost::split(vec_cmd_args, cmd, boost::is_any_of(" "));
+        split_arg(vec_cmd_args, cmd.c_str(), " ");
         exe_file = vec_cmd_args[0].c_str();
         if (vec_cmd_args.size() > 0) {
             exe_args = new char*[vec_cmd_args.size() + 1];
