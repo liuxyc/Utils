@@ -17,6 +17,8 @@ const int PROCC_STDOUT_PIPE = -2;
 const int PROCC_STDERR_NONE = -1;
 const int PROCC_STDERR_PIPE = -2;
 
+extern bool canAccess(const char *file_path);
+
 class PerfCollector;
 
 class Procc

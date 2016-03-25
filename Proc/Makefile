@@ -1,6 +1,6 @@
 
 proc_test: process.o test.o
-	g++ -Wall -o proc_test process.o test.o -lboost_filesystem -lboost_system
+	g++ -Wall -o proc_test process.o test.o 
 
 test.o: src/test.cpp
 	g++ -c -g -std=c++11 -Wall -I./include src/test.cpp

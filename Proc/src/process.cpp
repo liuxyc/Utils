@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <boost/algorithm/string.hpp>    
-#include <boost/filesystem.hpp>    
 #include <vector>
 #include <algorithm>
 #include <fcntl.h>
@@ -17,6 +16,14 @@
 #include <fstream>
 
 #include "process.h"
+
+bool canAccess(const char *file_path)
+{
+  if(access(file_path, R_OK) == 0) {
+    return true;
+  }
+  return false;
+}
 
 Procc::Procc(int std_out_fd, int std_err_fd, size_t max_buf_len)
 : m_pid(-1)
@@ -159,7 +166,7 @@ bool Procc::is_alive(pid_t pid)
 {
   std::string proc_path("/proc/");
   proc_path += std::to_string(pid);
-  if (boost::filesystem::exists(proc_path)) {
+  if (canAccess(proc_path.c_str())) {
     proc_path += "/stat";
     std::ifstream proc_st_file(proc_path);
     if (proc_st_file.is_open()) {
@@ -297,7 +304,7 @@ void PerfCollector::collect()
   std::ifstream proc_st_file(proc_path + "/stat");
   std::ifstream proc_stm_file(proc_path + "/statm");
 
-  if (sys_stat_file.is_open() && boost::filesystem::exists(proc_path) 
+  if (sys_stat_file.is_open() && canAccess(proc_path.c_str()) 
       && proc_st_file.is_open() && proc_stm_file.is_open()) {
     uint64_t sys_total = 0;
     std::string xtime;
